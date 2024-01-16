@@ -1,0 +1,92 @@
+@page "/"
+@using IGNW
+@using Models.IGNW
+@using System.Reactive.Linq
+@using System.Reactive.Subjects
+@inject IIGNWService IGNWService
+@implements IDisposable;
+
+<div class="column-layout master-view-container">
+    <div class="column-layout group">
+        <IgbCombo Outlined="true" Data="@_iGNWCustomerDto" Label="Select a Customer .." DisplayKey="CustomerId" SingleSelect="true" Change="SingleSelectComboChange" class="single-select-combo" master_view-scope></IgbCombo>
+    </div>
+    <div class="row-layout group_1">
+        <div class="column-layout group_2">
+            <IgbGrid Data="@_iGNWOrderDto" PrimaryKey="OrderId" DisplayDensity="DisplayDensity.Cosy" RowSelection="GridSelectionMode.Single" AllowFiltering="true" FilterMode="FilterMode.ExcelStyleFilter" AutoGenerate="false" RowSelectionChanging="GridRowSelectionChanging" class="ig-typography grid" master_view-scope>
+                <IgbGridToolbar>
+                    <IgbGridToolbarActions>
+                        <IgbGridToolbarHiding></IgbGridToolbarHiding>
+                    </IgbGridToolbarActions>
+                    <IgbGridToolbarTitle>Customer Orders</IgbGridToolbarTitle>
+                </IgbGridToolbar>
+                <IgbColumn Field="OrderId" DataType="GridColumnDataType.Number" Header="orderId" Sortable="true" Selectable="false"></IgbColumn>
+                <IgbColumn Field="CustomerId" DataType="GridColumnDataType.String" Header="customerId" Sortable="true" Selectable="false"></IgbColumn>
+                <IgbColumn Field="EmployeeId" DataType="GridColumnDataType.Number" Header="employeeId" Sortable="true" Selectable="false"></IgbColumn>
+                <IgbColumn Field="ShipperId" DataType="GridColumnDataType.Number" Header="shipperId" Sortable="true" Selectable="false"></IgbColumn>
+                <IgbColumn Field="OrderDate" DataType="GridColumnDataType.String" Header="orderDate" Sortable="true" Selectable="false"></IgbColumn>
+                <IgbColumn Field="RequiredDate" DataType="GridColumnDataType.String" Header="requiredDate" Sortable="true" Selectable="false"></IgbColumn>
+                <IgbColumn Field="ShipVia" DataType="GridColumnDataType.Number" Header="shipVia" Sortable="true" Selectable="false"></IgbColumn>
+                <IgbColumn Field="Freight" DataType="GridColumnDataType.Number" Header="freight" Sortable="true" Selectable="false"></IgbColumn>
+                <IgbColumn Field="ShipName" DataType="GridColumnDataType.String" Header="shipName" Sortable="true" Selectable="false"></IgbColumn>
+                <IgbColumn Field="ShipAddress.Street" DataType="GridColumnDataType.String" Header="shipAddress street" Sortable="true" Selectable="false"></IgbColumn>
+                <IgbColumn Field="ShipAddress.City" DataType="GridColumnDataType.String" Header="shipAddress city" Sortable="true" Selectable="false"></IgbColumn>
+                <IgbColumn Field="ShipAddress.Region" DataType="GridColumnDataType.String" Header="shipAddress region" Sortable="true" Selectable="false"></IgbColumn>
+                <IgbColumn Field="ShipAddress.PostalCode" DataType="GridColumnDataType.String" Header="shipAddress postalCode" Sortable="true" Selectable="false"></IgbColumn>
+                <IgbColumn Field="ShipAddress.Country" DataType="GridColumnDataType.String" Header="shipAddress country" Sortable="true" Selectable="false"></IgbColumn>
+                <IgbColumn Field="ShipAddress.Phone" DataType="GridColumnDataType.String" Header="shipAddress phone" Sortable="true" Selectable="false"></IgbColumn>
+            </IgbGrid>
+        </div>
+        <div class="column-layout group_2">
+            <IgbGrid Data="@_iGNWOrderDetailDto" PrimaryKey="OrderId" DisplayDensity="DisplayDensity.Cosy" AllowFiltering="true" FilterMode="FilterMode.ExcelStyleFilter" AutoGenerate="false" class="ig-typography grid" master_view-scope>
+                <IgbGridToolbar>
+                    <IgbGridToolbarTitle>Order Details</IgbGridToolbarTitle>
+                </IgbGridToolbar>
+                <IgbColumn Field="OrderId" DataType="GridColumnDataType.Number" Header="orderId" Sortable="true" Selectable="false"></IgbColumn>
+                <IgbColumn Field="ProductId" DataType="GridColumnDataType.Number" Header="productId" Sortable="true" Selectable="false"></IgbColumn>
+                <IgbColumn Field="UnitPrice" DataType="GridColumnDataType.Number" Header="unitPrice" Sortable="true" Selectable="false"></IgbColumn>
+                <IgbColumn Field="Quantity" DataType="GridColumnDataType.Number" Header="quantity" Sortable="true" Selectable="false"></IgbColumn>
+                <IgbColumn Field="Discount" DataType="GridColumnDataType.Number" Header="discount" Sortable="true" Selectable="false"></IgbColumn>
+            </IgbGrid>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<CustomerDto> _iGNWCustomerDto = new();
+    private List<OrderDto> _iGNWOrderDto = new();
+    private List<OrderDetailDto> _iGNWOrderDetailDto = new();
+    private Subject<object> destroy = new();
+
+    public void SingleSelectComboChange(IgbComboChangeEventArgs e)
+    {
+        IGNWService.SelectedCustomer.OnNext((CustomerDto)e.Detail.NewValue.FirstOrDefault());
+    }
+
+    public void GridRowSelectionChanging(IgbRowSelectionEventArgs e)
+    {
+        IGNWService.SelectedOrder.OnNext((OrderDto)e.Detail.NewSelection.FirstOrDefault());
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _iGNWCustomerDto = await IGNWService.GetCustomerDtoList();
+        IGNWService.SelectedCustomer.TakeUntil(this.destroy).Subscribe(async _ => 
+        {
+            _iGNWOrderDto = await IGNWService.GetOrderDtoList($"{IGNWService.SelectedCustomer.Value?.CustomerId}");
+            await InvokeAsync(StateHasChanged);
+        });
+        IGNWService.SelectedOrder.TakeUntil(this.destroy).Subscribe(async _ => 
+        {
+            _iGNWOrderDetailDto = await IGNWService.GetOrderDetailDtoList($"{IGNWService.SelectedOrder.Value?.OrderId}");
+            await InvokeAsync(StateHasChanged);
+        });
+
+        await base.OnInitializedAsync();
+    }
+
+    public void Dispose()
+    {
+        this.destroy.OnNext(null);
+        this.destroy.Dispose();
+    }
+}
